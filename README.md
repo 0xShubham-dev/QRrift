@@ -15,7 +15,7 @@ QRift is a lightweight, privacy-first tool designed to instantly transfer text, 
 
 ---
 
-## ✨ Features
+## Features
 
 - **Frictionless Transfer:** Instantly convert long strings and code into QR codes, or scan to retrieve text.
 - **Privacy-Focused:** 100% local text processing. Your data never leaves your screens.
