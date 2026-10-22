@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Quick Transfer</title>
+    
+    <!-- Local Offline Libraries -->
+    <script src="qrcode.min.js"></script>
+    <script src="html5-qrcode.min.js"></script>
+
+<link rel="icon" type="image/png" href="assets/icon.png">
+
+    <style>
+        :root { --bg-color: #121212; --surface-color: #1e1e1e; --text-color: #ffffff; --primary: #007bff; --success: #28a745; --accent: #ff9800; }
+        body { font-family: system-ui, -apple-system, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; }
+        .container { width: 100%; max-width: 500px; background: var(--surface-color); padding: 20px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+        h2 { text-align: center; margin-top: 0; font-weight: 500; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 25px; }
+        .tab-btn { flex: 1; padding: 12px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; background: #333; color: #aaa; transition: all 0.2s; }
+        .tab-btn.active { background: var(--primary); color: #fff; }
+        .section { display: none; animation: fadeIn 0.3s; }
+        .section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .input-wrapper { position: relative; width: 100%; }
+        textarea { width: 100%; height: 120px; padding: 15px; border-radius: 8px; border: 1px solid #444; background: #2a2a2a; color: #fff; font-size: 16px; box-sizing: border-box; margin-bottom: 20px; resize: vertical; }
+        textarea:focus { outline: 2px solid var(--primary); }
+        .clear-btn { position: absolute; top: 10px; right: 10px; background: #444; color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; transition: background 0.2s; }
+        .clear-btn:hover { background: #dc3545; }
+        .qr-wrapper { background: #fff; padding: 20px; border-radius: 12px; display: flex; justify-content: center; width: fit-content; margin: 0 auto; min-height: 250px; min-width: 250px; align-items: center; display: none; }
+        #reader { width: 100%; border-radius: 8px; overflow: hidden; border: 2px solid #333; }
+        #reader video { transform: scaleX(-1); }
+        .status-text { text-align: center; margin-top: 15px; font-size: 14px; color: #bbb; }
+        .result-box { background: #2a2a2a; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid var(--success); word-break: break-all; font-size: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .action-btn { background: var(--accent); color: #000; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 14px; font-weight: bold; display: inline-block; text-align: center; width: fit-content; }
+        .action-btn:hover { background: #e68a00; }
+        .history-container { margin-top: 25px; border-top: 1px solid #444; padding-top: 15px; }
+        .history-container h3 { font-size: 16px; margin: 0 0 10px 0; color: #aaa; }
+        #history-list { list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; }
+        #history-list li { background: #222; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; word-break: break-all; border: 1px solid #333; display: flex; flex-direction: column; gap: 8px; }
+        .history-actions { display: flex; gap: 8px; }
+        .copy-btn, .open-btn { color: #fff; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 12px; flex-shrink: 0; }
+        .copy-btn { background: #444; }
+        .copy-btn:hover { background: #555; }
+        .open-btn { background: var(--accent); color: #000; font-weight: bold; }
+        .open-btn:hover { background: #e68a00; }
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--success); color: white; padding: 12px 24px; border-radius: 30px; display: none; font-weight: bold; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .logo-img { display: block; margin: 0 auto 10px auto; max-height: 60px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 2. IN-APP LOGO GOES HERE -->
+        
+        <h2>Quick Transfer</h2>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('send', this)">Send</button>
+            <button class="tab-btn" onclick="switchTab('receive', this)">Receive</button>
+        </div>
+
+        <div id="send" class="section active">
+            <div class="input-wrapper">
+                <textarea id="textInput" placeholder="Type or paste text/URLs here..." oninput="generateQR()"></textarea>
+                <button class="clear-btn" onclick="clearText()" title="Clear text">✖</button>
+            </div>
+            <div id="qrWrapper" class="qr-wrapper">
+                <div id="qrcode"></div>
+            </div>
+            <p class="status-text">QR updates automatically as you type.</p>
+        </div>
+
+        <div id="receive" class="section">
+            <div id="reader"></div>
+            <p id="scan-status" class="status-text">Select this tab to activate webcam.</p>
+            <div class="result-box">
+                <div>
+                    <strong>Last Scan:</strong> <br>
+                    <span id="current-scan">Waiting for QR code...</span>
+                </div>
+                <div id="dynamic-link-action"></div>
+            </div>
+            <div class="history-container">
+                <h3>Recent History</h3>
+                <ul id="history-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">✅ Copied to Clipboard!</div>
+
+    <script>
+        let html5QrcodeScanner = null, isPaused = false, qrcode = null, scanHistory = [];
+
+        function isValidURL(str) { try { new URL(str); return true; } catch (_) { return false; } }
+
+        function switchTab(tabId, btnElement) {
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            btnElement.classList.add('active');
+            tabId === 'receive' ? startScanner() : stopScanner();
+        }
+
+        function clearText() {
+            const textInput = document.getElementById("textInput");
+            textInput.value = "";
+            textInput.focus(); 
+            generateQR();      
+        }
+
+        function generateQR() {
+            const text = document.getElementById("textInput").value;
+            const qrWrapper = document.getElementById("qrWrapper");
+            if (text.trim() !== "") {
+                qrWrapper.style.display = "flex"; 
+                if (!qrcode) {
+                    qrcode = new QRCode(document.getElementById("qrcode"), {
+                        width: 250, height: 250, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
+                    });
+                }
+                qrcode.makeCode(text);
+            } else {
+                qrWrapper.style.display = "none";
+                if (qrcode) qrcode.clear();
+            }
+        }
+
+        function startScanner() {
+            if (!html5QrcodeScanner) html5QrcodeScanner = new Html5Qrcode("reader");
+            document.getElementById("scan-status").innerText = "Requesting camera access...";
+            html5QrcodeScanner.start(
+                { facingMode: "user" }, { fps: 10, qrbox: { width: 250, height: 250 } },
+                (decodedText) => {
+                    if (isPaused) return;
+                    document.getElementById("current-scan").innerText = decodedText;
+                    copyToClipboard(decodedText);
+                    
+                    const linkActionDiv = document.getElementById("dynamic-link-action");
+                    linkActionDiv.style.display = "flex";
+                    linkActionDiv.style.gap = "10px";
+                    let buttonsHTML = `<button class="action-btn" style="background: #444; color: #fff;" onclick="copyToClipboard(document.getElementById('current-scan').innerText)">📋 Copy</button>`;
+                    if (isValidURL(decodedText)) buttonsHTML += `<button class="action-btn" onclick="window.open('${decodedText}', '_blank')">🌐 Open Link</button>`;
+                    linkActionDiv.innerHTML = buttonsHTML;
+
+                    addToHistory(decodedText);
+                    document.getElementById("scan-status").innerText = "Scan successful!";
+                    isPaused = true;
+                    setTimeout(() => { isPaused = false; document.getElementById("scan-status").innerText = "Ready for next QR code..."; }, 3000);
+                },
+                () => {} 
+            ).then(() => {
+                document.getElementById("scan-status").innerText = "Scanning active. Hold up QR code.";
+            }).catch(err => {
+                document.getElementById("scan-status").innerText = "Camera access denied or unavailable.";
+            });
+        }
+
+        function stopScanner() {
+            if (html5QrcodeScanner && html5QrcodeScanner.isScanning) html5QrcodeScanner.stop().catch(console.error);
+        }
+
+        function addToHistory(text) {
+            if (scanHistory.length > 0 && scanHistory[0] === text) return;
+            scanHistory.unshift(text); 
+            if (scanHistory.length > 10) scanHistory.pop(); 
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const list = document.getElementById("history-list");
+            list.innerHTML = "";
+            scanHistory.forEach(text => {
+                const li = document.createElement("li");
+                const span = document.createElement("span");
+                span.innerText = text;
+                const actionDiv = document.createElement("div");
+                actionDiv.className = "history-actions";
+                
+                const copyBtn = document.createElement("button");
+                copyBtn.className = "copy-btn";
+                copyBtn.innerText = "Copy";
+                copyBtn.onclick = () => copyToClipboard(text);
+                actionDiv.appendChild(copyBtn);
+                
+                if (isValidURL(text)) {
+                    const openBtn = document.createElement("button");
+                    openBtn.className = "open-btn";
+                    openBtn.innerText = "Open Link";
+                    openBtn.onclick = () => window.open(text, '_blank');
+                    actionDiv.appendChild(openBtn);
+                }
+                li.appendChild(span);
+                li.appendChild(actionDiv);
+                list.appendChild(li);
+            });
+        }
+
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(showToast).catch(err => console.error("Clipboard blocked", err));
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try { document.execCommand('copy'); showToast(); } catch (err) {}
+                document.body.removeChild(textArea);
+            }
+        }
+
+        function showToast() {
+            const toast = document.getElementById("toast");
+            toast.style.display = "block";
+            setTimeout(() => { toast.style.display = "none"; }, 2500);
+        }
+
+        document.getElementById("textInput").value = "";
+    </script>
+</body>
+</html>
